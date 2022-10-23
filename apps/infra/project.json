@@ -1,0 +1,62 @@
+{
+  "name": "infra",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/infra/src",
+  "targets": {
+    "destroy": {
+      "executor": "@ago-dev/nx-aws-cdk-v2:destroy",
+      "options": {}
+    },
+    "bootstrap": {
+      "executor": "@ago-dev/nx-aws-cdk-v2:bootstrap",
+      "options": {}
+    },
+    "deploy": {
+      "executor": "nx:run-commands",
+      "options": {
+        "color": true,
+        "cwd": "apps/infra",
+        "all": true,
+        "require-approval": "never",
+        "commands": ["npx cdk deploy --all"]
+      }
+    },
+    "synth": {
+      "executor": "nx:run-commands",
+      "options": {
+        "color": true,
+        "cwd": "apps/infra",
+        "parallel": false,
+        "commands": [
+          "npx cdk synthesize --outputs-file ./cdk-outputs.json --debug --all"
+        ]
+      }
+    },
+    "diff": {
+      "executor": "nx:run-commands",
+      "options": {
+        "color": true,
+        "cwd": "apps/infra",
+        "parallel": false,
+        "commands": ["npx cdk diff"]
+      }
+    },
+    "lint": {
+      "executor": "@nrwl/linter:eslint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["apps/infra/**/*.ts"]
+      }
+    },
+    "test": {
+      "executor": "@nrwl/jest:jest",
+      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+      "options": {
+        "jestConfig": "apps/infra/jest.config.ts",
+        "passWithNoTests": true
+      }
+    }
+  },
+  "tags": []
+}

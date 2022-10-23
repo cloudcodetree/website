@@ -1,0 +1,19 @@
+[environment]
+account = "AKIAQGUYP6OSMVA3AQPA" # Your AWS account ID
+
+# [admin]
+## Both certificate ARN should create and get through Makefile
+# serverCertificateArn = "arn:aws:acm:us-east-1:YOUR_AWS_ACCOUNT_ID:certificate/xxxxxxxxxxxxxxxxxxxxxxxx"
+# clientCertificateArn = "arn:aws:acm:us-east-1:YOUR_AWS_ACCOUNT_ID:certificate/yyyyyyyyyyyyyyyyyyyyyyyy"
+
+# [database]
+# username = "wordpress" #Database username
+# defaultDatabaseName = "wordpress" #Default database name
+
+# [domain]
+# domainName = "blueskycloud.io" #Your root domain name, usually is the domain name of the created public hosted zone in Route 53
+# hostname = "blog.blueskycloud.io" #Your desire hostname for the WordPress
+# alternativeHostname = ["*.blueskycloud.io"]
+
+# [contact]
+# email = ["chris+"] #Email address for notify any in-compliance event in AWS Config

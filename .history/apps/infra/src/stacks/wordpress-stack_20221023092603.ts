@@ -1,0 +1,15 @@
+// import * as ec2 from '@aws-cdk/aws-ec2';
+// import * as ecs from '@aws-cdk/aws-ecs';
+// import * as ecsPatterns from '@aws-cdk/aws-ecs-patterns';
+// import * as efs from '@aws-cdk/aws-efs';
+// import * as rds from '@aws-cdk/aws-rds';
+// import * as secretsManager from '@aws-cdk/aws-secretsmanager';
+import { Stack, App, StackProps } from 'aws-cdk-lib';
+
+export class WordpressStack extends Stack {
+  constructor(scope: App, id: string, props?: StackProps) {
+    super(scope, id, props);
+
+    // defines your stack here
+  }
+}
