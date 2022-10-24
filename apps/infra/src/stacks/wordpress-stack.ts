@@ -1,4 +1,4 @@
-import { Stack, App, StackProps } from 'aws-cdk-lib';
+import { Stack, App, StackProps, CfnOutput, Duration } from 'aws-cdk-lib';
 import {
   Vpc,
   InstanceType,
@@ -16,20 +16,45 @@ import {
 import { FileSystem } from 'aws-cdk-lib/aws-efs';
 import { ContainerImage } from 'aws-cdk-lib/aws-ecs';
 import { ApplicationLoadBalancedFargateService } from 'aws-cdk-lib/aws-ecs-patterns';
+import { HostedZone, ARecord, RecordTarget } from 'aws-cdk-lib/aws-route53';
+import {
+  Certificate,
+  CertificateValidation,
+} from 'aws-cdk-lib/aws-certificatemanager';
+import { LoadBalancerTarget } from 'aws-cdk-lib/aws-route53-targets';
+import { HttpsRedirect } from 'aws-cdk-lib/aws-route53-patterns';
+import { AppStackProps } from './app-stack';
 
 export class WordpressStack extends Stack {
-  constructor(scope: App, id: string, props?: StackProps) {
+  constructor(scope: App, id: string, props: AppStackProps) {
     super(scope, id, props);
 
-    const vpc = new Vpc(this, `cct-vpc`);
-    const credSecret = new Secret(this, `cct-db-secret`, {
+    const { prefix, domainName } = props;
+
+    const hostedZone = HostedZone.fromLookup(this, `${prefix}-hosted-zone`, {
+      domainName,
+    });
+
+    const certificate = new Certificate(this, `${prefix}-wildcard-cert`, {
+      domainName,
+      subjectAlternativeNames: [`*.${domainName}`],
+      validation: CertificateValidation.fromDns(hostedZone),
+    });
+
+    const certificateArn = certificate.certificateArn;
+    new CfnOutput(this, 'CertificateArn', {
+      value: certificateArn,
+    });
+
+    const vpc = new Vpc(this, `${prefix}-vpc`);
+    const credSecret = new Secret(this, `${prefix}-db-secret`, {
       secretName: '/wordpress-db',
       generateSecretString: {
         passwordLength: 20,
         excludePunctuation: true,
       },
     });
-    const db = new DatabaseCluster(this, `cct-wp-db`, {
+    const db = new DatabaseCluster(this, `${prefix}-wp-db`, {
       engine: DatabaseClusterEngine.auroraMysql({
         version: AuroraMysqlEngineVersion.VER_3_02_1,
       }),
@@ -43,31 +68,38 @@ export class WordpressStack extends Stack {
       credentials: Credentials.fromPassword('chris', credSecret.secretValue),
       defaultDatabaseName: 'wordpress',
     });
-    const fs = new FileSystem(this, `ctt-fx`, {
+    const fs = new FileSystem(this, `${prefix}-fx`, {
       fileSystemName: 'wordpress',
       vpc,
       vpcSubnets: {
         subnetType: SubnetType.PRIVATE_WITH_EGRESS,
       },
     });
-    const wp = new ApplicationLoadBalancedFargateService(this, `cct-wp-srv`, {
-      taskImageOptions: {
-        image: ContainerImage.fromRegistry('library/wordpress:latest'),
-        environment: {
-          WORDPRESS_DB_NAME: 'wordpress',
-          WORDPRESS_DB_USER: 'chris',
-          WORDPRESS_DB_PASSWORD: credSecret.secretValue.unsafeUnwrap(),
-          WORDPRESS_DB_HOST: db.clusterEndpoint.hostname,
-          WORDPRESS_TABLE_PREFIX: 'wp_',
+    const wp = new ApplicationLoadBalancedFargateService(
+      this,
+      `${prefix}-wp-srv`,
+      {
+        taskImageOptions: {
+          image: ContainerImage.fromRegistry('library/wordpress:latest'),
+          environment: {
+            WORDPRESS_DB_NAME: 'wordpress',
+            WORDPRESS_DB_USER: 'chris',
+            WORDPRESS_DB_PASSWORD: credSecret.secretValue.unsafeUnwrap(),
+            WORDPRESS_DB_HOST: db.clusterEndpoint.hostname,
+            WORDPRESS_TABLE_PREFIX: 'wp_',
+          },
         },
-      },
-      cpu: 256,
-      memoryLimitMiB: 1024,
-      vpc,
-      taskSubnets: {
-        subnetType: SubnetType.PRIVATE_WITH_EGRESS,
-      },
-    });
+        cpu: 256,
+        memoryLimitMiB: 1024,
+        vpc,
+        taskSubnets: {
+          subnetType: SubnetType.PRIVATE_WITH_EGRESS,
+        },
+        publicLoadBalancer: true,
+        certificate,
+        redirectHTTP: true,
+      }
+    );
 
     db.connections.allowDefaultPortFrom(wp.service.connections);
     fs.connections.allowDefaultPortFrom(wp.service.connections);
@@ -75,12 +107,12 @@ export class WordpressStack extends Stack {
       efsVolumeConfiguration: {
         fileSystemId: fs.fileSystemId,
       },
-      name: 'ctt-wp-vol',
+      name: `${prefix}-wp-vol`,
     });
     wp.taskDefinition.defaultContainer?.addMountPoints({
       containerPath: '/var/www/html',
       readOnly: false,
-      sourceVolume: 'ctt-wp-vol',
+      sourceVolume: `${prefix}-wp-vol`,
     });
     wp.targetGroup.configureHealthCheck({
       path: '/',
@@ -97,6 +129,19 @@ export class WordpressStack extends Stack {
 
     targetScaling.scaleOnMemoryUtilization('memoryScaling', {
       targetUtilizationPercent: 75,
+    });
+
+    new ARecord(this, `${prefix}-wp-a-record`, {
+      recordName: 'blog',
+      zone: hostedZone,
+      target: RecordTarget.fromAlias(new LoadBalancerTarget(wp.loadBalancer)),
+      ttl: Duration.minutes(1),
+    });
+
+    new HttpsRedirect(this, `${prefix}-wordpress-redirect`, {
+      recordNames: [domainName],
+      targetDomain: `blog.${domainName}`,
+      zone: hostedZone,
     });
   }
 }

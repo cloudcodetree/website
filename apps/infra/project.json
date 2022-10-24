@@ -4,13 +4,14 @@
   "projectType": "application",
   "sourceRoot": "apps/infra/src",
   "targets": {
-    "destroy": {
-      "executor": "@ago-dev/nx-aws-cdk-v2:destroy",
-      "options": {}
-    },
     "bootstrap": {
-      "executor": "@ago-dev/nx-aws-cdk-v2:bootstrap",
-      "options": {}
+      "executor": "nx:run-commands",
+      "options": {
+        "color": true,
+        "cwd": "apps/infra",
+        "parallel": false,
+        "commands": ["npx cdk bootstrap"]
+      }
     },
     "deploy": {
       "executor": "nx:run-commands",
@@ -22,12 +23,23 @@
         "commands": ["npx cdk deploy --all"]
       }
     },
+    "destroy": {
+      "executor": "nx:run-commands",
+      "options": {
+        "color": true,
+        "cwd": "apps/infra",
+        "all": true,
+        "require-approval": "never",
+        "commands": ["npx cdk destroy --all"]
+      }
+    },
     "synth": {
       "executor": "nx:run-commands",
       "options": {
         "color": true,
         "cwd": "apps/infra",
         "parallel": false,
+        "all": true,
         "commands": [
           "npx cdk synthesize --outputs-file ./cdk-outputs.json --debug --all"
         ]
@@ -39,7 +51,8 @@
         "color": true,
         "cwd": "apps/infra",
         "parallel": false,
-        "commands": ["npx cdk diff"]
+        "all": true,
+        "commands": ["npx cdk diff --all"]
       }
     },
     "lint": {
